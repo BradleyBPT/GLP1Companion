@@ -1,0 +1,29 @@
+# macOS system junk
+.DS_Store
+.Trash/
+*.swp
+
+# Xcode & iOS build junk
+DerivedData/
+*.xcuserdata
+*.xcuserstate
+*.xcworkspace
+*.pbxuser
+
+# IDEs & dev tools
+.vscode/
+.idea/
+.env
+node_modules/
+build/
+
+# Ignore anything above project root
+../*
+../../*
+
+# Optional: ignore Git settings + shell files
+.gitconfig
+.zshrc
+.zprofile
+.zsh_sessions/
+.zsh_history

@@ -32,7 +32,7 @@ struct DailyInsight: Identifiable {
 }
 
 enum DailySummaryService {
-    static func summarize(records: [Record], goals: NutritionGoals?, schedule: MedicationSchedule?) -> DailySummary {
+    static func summarize(records: [Record], fluidLogs: [FluidIntakeLog], goals: NutritionGoals?, schedule: MedicationSchedule?) -> DailySummary {
         var caloriesIn: Double = 0
         var carbs: Double = 0
         var protein: Double = 0
@@ -49,10 +49,6 @@ enum DailySummaryService {
                 protein += record.protein ?? 0
                 fat += record.fat ?? 0
                 fiber += record.fiber ?? 0
-            case .hydration:
-                if let ml = record.value.flatMap(Double.init) {
-                    hydration += ml
-                }
             case .activity:
                 caloriesOut += record.calories ?? 0
             default:
@@ -60,11 +56,15 @@ enum DailySummaryService {
             }
         }
 
+        for log in fluidLogs {
+            hydration += log.amountML
+        }
+
         let phase = schedule?.phase
         let calorieGoal = (goals?.dailyCalories ?? 1800) + (phase?.suggestedCalorieOffset ?? 0)
         let fiberGoalBase = goals?.dailyFiber ?? 30
         let fiberGoal = schedule?.phase.suggestedFibreTarget ?? fiberGoalBase
-        let hydrationGoal = 2000.0
+        let hydrationGoal = goals?.dailyHydrationML ?? 2000.0
 
         return DailySummary(
             date: Date(),

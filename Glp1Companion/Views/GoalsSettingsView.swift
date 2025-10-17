@@ -11,6 +11,8 @@ struct GoalsSettingsView: View {
     @State private var proteinText: String
     @State private var fatText: String
     @State private var fiberText: String
+    @State private var hydrationText: String
+    @State private var selectedFluids: Set<FluidType>
 
     init(goals: NutritionGoals) {
         self._goals = Bindable(goals)
@@ -19,6 +21,9 @@ struct GoalsSettingsView: View {
         _proteinText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyProtein))
         _fatText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyFat))
         _fiberText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyFiber))
+        _hydrationText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyHydrationML))
+        let allowed = Set(goals.hydrationTypesEnabled.compactMap { FluidType(rawValue: $0) })
+        _selectedFluids = State(initialValue: allowed.isEmpty ? Set(FluidType.allCases) : allowed)
     }
 
     var body: some View {
@@ -34,6 +39,31 @@ struct GoalsSettingsView: View {
                 Section(footer: Text("Fibre helps GLP-1 medication users manage satiety and digestion. Aim for at least 30g per day unless your clinician advises otherwise.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)) { EmptyView() }
+
+                Section(header: Text("Hydration")) {
+                    NumericGoalField(title: "Daily goal", suffix: "mL", text: $hydrationText)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Count these beverages:")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        ForEach(FluidType.allCases) { type in
+                            Toggle(type.displayName, isOn: Binding(
+                                get: { selectedFluids.contains(type) },
+                                set: { enabled in
+                                    if enabled { selectedFluids.insert(type) } else { selectedFluids.remove(type) }
+                                }
+                            ))
+                        }
+                    }
+                }
+
+                if !goals.history.isEmpty {
+                    Section(header: Text("Goal History")) {
+                        NavigationLink("View history") {
+                            GoalHistoryView(history: goals.history.sorted(by: { $0.date > $1.date }))
+                        }
+                    }
+                }
             }
             .navigationTitle("Nutrition Goals")
             .toolbar {
@@ -52,11 +82,12 @@ struct GoalsSettingsView: View {
     }
 
     private var isValid: Bool {
-        [calorieText, carbsText, proteinText, fatText, fiberText]
+        [calorieText, carbsText, proteinText, fatText, fiberText, hydrationText]
             .allSatisfy {
                 if let value = GoalsSettingsView.parseNumber($0) { return value > 0 }
                 return false
             }
+            && !selectedFluids.isEmpty
     }
 
     private func saveChanges() {
@@ -65,6 +96,17 @@ struct GoalsSettingsView: View {
         goals.dailyProtein = GoalsSettingsView.parseNumber(proteinText) ?? goals.dailyProtein
         goals.dailyFat = GoalsSettingsView.parseNumber(fatText) ?? goals.dailyFat
         goals.dailyFiber = GoalsSettingsView.parseNumber(fiberText) ?? goals.dailyFiber
+        goals.dailyHydrationML = GoalsSettingsView.parseNumber(hydrationText) ?? goals.dailyHydrationML
+        goals.hydrationTypesEnabled = selectedFluids.map { $0.rawValue }
+        let entry = GoalHistoryEntry(date: Date(),
+                                     calories: goals.dailyCalories,
+                                     carbs: goals.dailyCarbs,
+                                     protein: goals.dailyProtein,
+                                     fat: goals.dailyFat,
+                                     fiber: goals.dailyFiber,
+                                     reason: .manual,
+                                     notes: "Updated via goal settings")
+        goals.history.append(entry)
         goals.updatedAt = Date()
         do {
             try context.save()

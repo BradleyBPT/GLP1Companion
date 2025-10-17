@@ -12,6 +12,9 @@ final class NutritionGoals {
     var dailyProtein: Double
     var dailyFat: Double
     var dailyFiber: Double
+    var dailyHydrationML: Double
+    var hydrationTypesEnabled: [FluidType.RawValue]
+    @Relationship(deleteRule: .cascade) var history: [GoalHistoryEntry] = []
 
     init(id: UUID = UUID(),
          createdAt: Date = Date(),
@@ -20,7 +23,9 @@ final class NutritionGoals {
          dailyCarbs: Double = 130,
          dailyProtein: Double = 90,
          dailyFat: Double = 60,
-         dailyFiber: Double = 30) {
+         dailyFiber: Double = 30,
+         dailyHydrationML: Double = 2000,
+         hydrationTypesEnabled: [FluidType.RawValue] = FluidType.allCases.map { $0.rawValue }) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -29,5 +34,7 @@ final class NutritionGoals {
         self.dailyProtein = dailyProtein
         self.dailyFat = dailyFat
         self.dailyFiber = dailyFiber
+        self.dailyHydrationML = dailyHydrationML
+        self.hydrationTypesEnabled = hydrationTypesEnabled
     }
 }

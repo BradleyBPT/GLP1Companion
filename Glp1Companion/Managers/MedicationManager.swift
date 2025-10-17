@@ -22,7 +22,8 @@ final class MedicationManager: ObservableObject {
         }
     }
 
-    func update(name: String, dose: String, phase: MedicationPhase, nextDose: Date?, notes: String?) {
+    func update(medicationID: String?, name: String, dose: String, phase: MedicationPhase, nextDose: Date?, notes: String?) {
+        schedule.medicationID = medicationID
         schedule.medicationName = name
         schedule.currentDose = dose
         schedule.phase = phase

@@ -22,18 +22,29 @@ struct DailyDashboardView: View {
     @State private var isSyncingHealth = false
     @State private var lastHealthSync: Date?
     @State private var healthSyncError: String?
+    @State private var showHydrationSheet = false
+    @State private var hydrationAmount: Double = 250
+    @State private var hydrationType: FluidType = .water
+    @State private var hydrationNotes: String = ""
 
     private let healthKitManager = HealthKitManager()
     private var goals: NutritionGoals {
         goalsQuery.first ?? NutritionGoals()
     }
     private var summary: DailySummary {
-        DailySummaryService.summarize(records: todaysRecords, goals: goals, schedule: schedule)
+        DailySummaryService.summarize(records: todaysRecords, fluidLogs: todayFluidLogs, goals: goals, schedule: schedule)
     }
     private var insights: [DailyInsight] {
         DailySummaryService.insights(for: summary)
     }
     private var schedule: MedicationSchedule? { scheduleQuery.first }
+    private var todayFluidLogs: [FluidIntakeLog] {
+        let start = Calendar.current.startOfDay(for: Date())
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start) ?? Date()
+        let predicate = #Predicate<FluidIntakeLog> { $0.date >= start && $0.date < end }
+        let descriptor = FetchDescriptor<FluidIntakeLog>(predicate: predicate, sortBy: [SortDescriptor(\.date, order: .reverse)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
 
     private let summaryColumns: [GridItem] = [
         GridItem(.adaptive(minimum: 160), spacing: 12)
@@ -62,6 +73,11 @@ struct DailyDashboardView: View {
                     }
                     .padding(.horizontal, 20)
                 }
+
+                FluidIntakeSection(summary: summary) {
+                    showHydrationSheet = true
+                }
+                .padding(.horizontal, 20)
 
                 if !insights.isEmpty {
                     Text("Daily insights")
@@ -139,6 +155,17 @@ struct DailyDashboardView: View {
                 pendingMealAction = nil
                 showMealSheet = false
             })
+        }
+        .sheet(isPresented: $showHydrationSheet) {
+            HydrationLogSheet(amount: $hydrationAmount, type: $hydrationType, notes: $hydrationNotes) { amount, type, notes in
+                logHydration(amount: amount, type: type, notes: notes)
+                showHydrationSheet = false
+                hydrationAmount = 250
+                hydrationType = .water
+                hydrationNotes = ""
+            } onCancel: {
+                showHydrationSheet = false
+            }
         }
         .overlay(alignment: .top) {
             if let flash = flashMessage {
@@ -228,7 +255,17 @@ struct DailyDashboardView: View {
             }
             if let schedule {
                 HStack(spacing: 12) {
-                    Label("Phase: \(schedule.phase.displayName)", systemImage: "pills.fill")
+                    Label(schedule.medicationName, systemImage: "pills.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption.weight(.semibold))
+                    if !schedule.currentDose.isEmpty {
+                        Text(schedule.currentDose)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                HStack(spacing: 12) {
+                    Label("Phase: \(schedule.phase.displayName)", systemImage: "chart.bar.doc.horizontal")
                         .labelStyle(.titleAndIcon)
                         .font(.caption)
                     if let next = schedule.nextDoseDate {
@@ -274,7 +311,15 @@ struct DailyDashboardView: View {
     private var quickActions: [QuickAction] {
         return [
             QuickAction(label: "200 mL", icon: "drop.fill", tint: .accentColor) {
-                performQuickAction(for: .hydration) { $0.addHydration(amountML: 200) }
+                let action = {
+                    logHydration(amount: 200, type: .water, notes: nil)
+                }
+                if isConsentEnabled(.hydration) {
+                    action()
+                } else {
+                    pendingAction = action
+                    consentPrompt = .hydration
+                }
             },
             QuickAction(label: "Med 500mg", icon: "pills.fill", tint: .green) {
                 performQuickAction(for: .medication) { $0.addMedication(name: "Metformin", dose: "500mg") }
@@ -326,20 +371,24 @@ struct DailyDashboardView: View {
     }
 
     private var summaryItems: [SummaryItem] {
-        let hydrationRecords = todaysRecords.filter { $0.type == .hydration }
-        let hydrationTotal = hydrationRecords.compactMap { Int($0.value ?? "") }.reduce(0, +)
-        let hydrationSubtitle = hydrationRecords.isEmpty
-            ? "No hydration logged yet"
-            : "\(hydrationRecords.count) \(hydrationRecords.count == 1 ? "entry" : "entries") recorded"
+        let hydrationTotal = Int(summary.hydrationML.rounded())
+        let hydrationLogged = todaysRecords.contains(where: { $0.type == .hydration })
+        let hydrationSubtitle = hydrationLogged
+            ? "\(hydrationTotal) / \(Int(summary.hydrationGoalML)) mL"
+            : "No hydration logged yet"
 
-        let medicationRecords = todaysRecords.filter { $0.type == .medication }
+        let medicationValue: String
         let medicationSubtitle: String
-        if let latestMedication = medicationRecords.first {
-            let time = latestMedication.date.formatted(date: .omitted, time: .shortened)
-            let name = latestMedication.note ?? "Medication"
-            medicationSubtitle = "\(name) at \(time)"
+        if let schedule {
+            medicationValue = schedule.currentDose
+            var subtitleParts: [String] = [schedule.phase.displayName]
+            if let next = schedule.nextDoseDate {
+                subtitleParts.append("Next: \(next.formatted(date: .abbreviated, time: .omitted))")
+            }
+            medicationSubtitle = subtitleParts.joined(separator: " • ")
         } else {
-            medicationSubtitle = "No medication logged yet"
+            medicationValue = "--"
+            medicationSubtitle = "Set your GLP-1 schedule"
         }
 
         let mealRecords = todaysRecords.filter { $0.type == .meal }
@@ -420,7 +469,7 @@ struct DailyDashboardView: View {
 
         var items: [SummaryItem] = [
             SummaryItem(title: "Hydration", value: "\(hydrationTotal) mL", subtitle: hydrationSubtitle, icon: "drop.fill", tint: .accentColor),
-            SummaryItem(title: "Medication", value: "\(medicationRecords.count) \(medicationRecords.count == 1 ? "dose" : "doses")", subtitle: medicationSubtitle, icon: "pills.fill", tint: .green),
+            SummaryItem(title: "Medication", value: medicationValue, subtitle: medicationSubtitle, icon: "pills.fill", tint: .green),
             SummaryItem(title: "Nutrition", value: "\(totalMealCaloriesInt) / \(calorieGoal) kcal", subtitle: mealsSubtitle, icon: "fork.knife", tint: Color(.systemOrange)),
             SummaryItem(title: "Activity", value: activityValue, subtitle: activitySubtitle, icon: "figure.walk", tint: .purple)
         ]
@@ -456,6 +505,17 @@ struct DailyDashboardView: View {
             pendingAction = { withManager(action) }
             consentPrompt = category
         }
+    }
+
+    private func logHydration(amount: Double, type: FluidType, notes: String?) {
+        withFluidManager { manager in
+            manager.log(amountML: amount, type: type, notes: notes)
+        }
+        withManager { manager in
+            let record = Record(type: .hydration, date: Date(), value: "\(Int(amount))", note: type.displayName)
+            manager.add(record)
+        }
+        showFlash("Hydration logged")
     }
 
     private func syncHealthData() {
@@ -506,6 +566,11 @@ struct DailyDashboardView: View {
     private func withManager(_ action: @MainActor (DataManager) -> Void) {
         let audit = AuditManager(context: context)
         let manager = DataManager(context: context, audit: audit)
+        action(manager)
+    }
+
+    private func withFluidManager(_ action: @MainActor (FluidLogManager) -> Void) {
+        let manager = FluidLogManager(context: context)
         action(manager)
     }
 
@@ -912,6 +977,74 @@ private struct InsightCard: View {
         case .positive: return "checkmark.seal.fill"
         case .neutral: return "info.circle.fill"
         case .warning: return "exclamationmark.triangle.fill"
+        }
+    }
+}
+
+private struct FluidIntakeSection: View {
+    let summary: DailySummary
+    let onAdd: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Hydration")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    onAdd()
+                } label: {
+                    Label("Log fluid", systemImage: "plus")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+            }
+            FluidIntakeCard(summary: summary)
+        }
+    }
+}
+
+private struct HydrationLogSheet: View {
+    @Binding var amount: Double
+    @Binding var type: FluidType
+    @Binding var notes: String
+
+    let onSave: (Double, FluidType, String?) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Amount")) {
+                    HStack {
+                        Slider(value: $amount, in: 50...1000, step: 50)
+                        Text("\(Int(amount)) mL")
+                    }
+                }
+
+                Picker("Type", selection: $type) {
+                    ForEach(FluidType.allCases) { type in
+                        Text(type.displayName).tag(type)
+                    }
+                }
+
+                Section(header: Text("Notes")) {
+                    TextEditor(text: $notes)
+                        .frame(height: 120)
+                }
+            }
+            .navigationTitle("Log fluid")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(amount, type, trimmedNotes.isEmpty ? nil : trimmedNotes)
+                    }
+                }
+            }
         }
     }
 }

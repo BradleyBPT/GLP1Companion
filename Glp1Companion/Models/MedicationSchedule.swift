@@ -39,6 +39,7 @@ final class MedicationSchedule {
     var createdAt: Date
     var updatedAt: Date
 
+    var medicationID: String?
     var medicationName: String
     var currentDose: String
     var phase: MedicationPhase
@@ -48,18 +49,25 @@ final class MedicationSchedule {
     init(id: UUID = UUID(),
          createdAt: Date = Date(),
          updatedAt: Date = Date(),
-         medicationName: String = "GLP-1",
-         currentDose: String = "0.25 mg",
+         medicationID: String? = GLP1MedicationLibrary.default.id,
+         medicationName: String = GLP1MedicationLibrary.default.brandName,
+         currentDose: String = GLP1MedicationLibrary.default.titrationDoses.first ?? "0.25 mg",
          phase: MedicationPhase = .titration,
          nextDoseDate: Date? = nil,
          notes: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.medicationID = medicationID
         self.medicationName = medicationName
         self.currentDose = currentDose
         self.phase = phase
         self.nextDoseDate = nextDoseDate
         self.notes = notes
+    }
+
+    var libraryMedication: GLP1Medication? {
+        guard let medicationID else { return nil }
+        return GLP1MedicationLibrary.medication(with: medicationID)
     }
 }

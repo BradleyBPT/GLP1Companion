@@ -21,7 +21,9 @@ struct Glp1CompanionApp: App {
                                     AuditLog.self,
                                     NutritionGoals.self,
                                     FoodProductCache.self,
-                                    MedicationSchedule.self)
+                                    MedicationSchedule.self,
+                                    FluidIntakeLog.self,
+                                    GoalHistoryEntry.self)
     }
 
     var body: some Scene {

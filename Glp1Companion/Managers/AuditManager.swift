@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+@MainActor
 final class AuditManager: ObservableObject {
     private let context: ModelContext
 

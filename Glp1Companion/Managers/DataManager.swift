@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+@MainActor
 final class DataManager: ObservableObject {
     @Published private(set) var records: [Record] = []
     private let context: ModelContext
@@ -88,9 +89,18 @@ final class DataManager: ObservableObject {
         }
     }
 
-    func addExercise(minutes: Int, description: String? = nil) {
+    func addExercise(minutes: Int, description: String? = nil, calories: Double? = nil) {
         // Use 'activity' for exercise records.
-        let record = Record(type: .activity, date: Date(), value: "\(minutes)", note: description)
+        var noteParts: [String] = []
+        if let description, !description.isEmpty {
+            noteParts.append(description)
+        }
+        if let calories, calories > 0 {
+            noteParts.append("\(Int(calories)) kcal")
+        }
+        let note = noteParts.isEmpty ? nil : noteParts.joined(separator: " • ")
+
+        let record = Record(type: .activity, date: Date(), value: "\(minutes)", note: note, calories: calories)
         let auditEntry = AuditLog(actionType: .create, timestamp: Date(), targetEntity: "Record", details: "exercise:\(minutes)")
         context.insert(record)
         context.insert(auditEntry)
@@ -102,9 +112,18 @@ final class DataManager: ObservableObject {
         }
     }
 
-    func addMeal(description: String) {
-        let record = Record(type: .meal, date: Date(), value: "", note: description)
-        let auditEntry = AuditLog(actionType: .create, timestamp: Date(), targetEntity: "Record", details: "meal:\(description)")
+    func addMeal(description: String, calories: Double?, carbs: Double?, protein: Double?, fat: Double?, fiber: Double?) {
+        let record = Record(type: .meal,
+                            date: Date(),
+                            value: nil,
+                            note: description,
+                            calories: calories,
+                            carbs: carbs,
+                            protein: protein,
+                            fat: fat,
+                            fiber: fiber)
+        let auditDetails = "meal:\(description):\(Int(calories ?? 0))kcal"
+        let auditEntry = AuditLog(actionType: .create, timestamp: Date(), targetEntity: "Record", details: auditDetails)
         context.insert(record)
         context.insert(auditEntry)
         do {
@@ -126,6 +145,30 @@ final class DataManager: ObservableObject {
             fetchAll()
         } catch {
             print("DataManager.addMood error: \(error)")
+        }
+    }
+
+    func update(_ record: Record,
+                value: String?,
+                note: String?,
+                calories: Double? = nil,
+                carbs: Double? = nil,
+                protein: Double? = nil,
+                fat: Double? = nil,
+                fiber: Double? = nil) {
+        record.value = value?.isEmpty == true ? nil : value
+        record.note = note?.isEmpty == true ? nil : note
+        record.calories = calories
+        record.carbs = carbs
+        record.protein = protein
+        record.fat = fat
+        record.fiber = fiber
+        do {
+            try context.save()
+            audit.log(action: .update, target: "Record", details: record.id.uuidString)
+            fetchAll()
+        } catch {
+            print("DataManager.update error: \(error)")
         }
     }
 

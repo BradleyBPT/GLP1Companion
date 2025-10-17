@@ -9,8 +9,16 @@ struct MainView: View {
             DailyDashboardView()
                 .navigationTitle("Health Companion")
                 .toolbar {
-                    NavigationLink(destination: PrivacyDashboardView()) {
-                        Image(systemName: "shield.lefthalf.fill")
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        NavigationLink(destination: MedicationScheduleContainerView()) {
+                            Image(systemName: "pills.fill")
+                        }
+                        NavigationLink(destination: AuditHistoryView()) {
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        NavigationLink(destination: PrivacyDashboardView()) {
+                            Image(systemName: "shield.lefthalf.fill")
+                        }
                     }
                 }
         }

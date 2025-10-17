@@ -8,7 +8,7 @@ struct PrivacyDashboardView: View {
     var body: some View {
         List {
             Section(header: Text("Privacy & Consent")) {
-                Text("All data stays on this device. Toggle consent for categories below.")
+                Text("Choose which logs you want to keep on this device. You can change these anytime.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -27,7 +27,13 @@ struct PrivacyDashboardView: View {
                             print("PrivacyDashboardView.toggle save error: \(error)")
                         }
                     })) {
-                        Text(c.category.rawValue.capitalized)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(c.category.permissionTitle)
+                                .font(.body.weight(.semibold))
+                            Text(c.category.permissionDescription)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

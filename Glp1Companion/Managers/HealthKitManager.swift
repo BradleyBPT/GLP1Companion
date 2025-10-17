@@ -11,8 +11,10 @@ final class HealthKitManager {
         if let steps = HKObjectType.quantityType(forIdentifier: .stepCount) { set.insert(steps) }
         if let energy = HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed) { set.insert(energy) }
         if let heartRate = HKObjectType.quantityType(forIdentifier: .heartRate) { set.insert(heartRate) }
+        if let activeEnergy = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) { set.insert(activeEnergy) }
         if let bodyMass = HKObjectType.quantityType(forIdentifier: .bodyMass) { set.insert(bodyMass) }
         if let glucose = HKObjectType.quantityType(forIdentifier: .bloodGlucose) { set.insert(glucose) }
+        set.insert(HKObjectType.workoutType())
         return set
     }
 
@@ -30,6 +32,7 @@ final class HealthKitManager {
     // Import today's samples and map them into your DataManager.
     // This pulls samples from midnight -> now for each supported type and
     // calls appropriate DataManager convenience methods to persist.
+    @MainActor
     func importTodayData(into dataManager: DataManager, completion: @escaping (Result<Int, Error>) -> Void) {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
@@ -37,93 +40,187 @@ final class HealthKitManager {
 
         var importedCount = 0
         var firstError: Error?
+        let dispatchGroup = DispatchGroup()
 
-        // Helper to fetch a quantity type
-        func fetchQuantitySamples(identifier: HKQuantityTypeIdentifier, unit: HKUnit, handler: @escaping (HKQuantitySample) -> Void, finished: @escaping () -> Void) {
-            guard let type = HKObjectType.quantityType(forIdentifier: identifier) else { finished(); return }
+        func fetchQuantitySamples(identifier: HKQuantityTypeIdentifier, handler: @MainActor @escaping ([HKQuantitySample]) -> Void) {
+            guard let type = HKObjectType.quantityType(forIdentifier: identifier) else { return }
+            dispatchGroup.enter()
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samplesOrNil, error in
-                if let error = error {
-                    firstError = firstError ?? error
-                } else if let samples = samplesOrNil as? [HKQuantitySample] {
-                    for s in samples {
-                        handler(s)
+                Task { @MainActor in
+                    if let error = error {
+                        firstError = firstError ?? error
+                    } else if let samples = samplesOrNil as? [HKQuantitySample], !samples.isEmpty {
+                        handler(samples)
                     }
+                    dispatchGroup.leave()
                 }
-                finished()
             }
             healthStore.execute(query)
         }
 
-        // Track how many fetches are outstanding
-        let dispatchGroup = DispatchGroup()
-
-        // dietaryWater -> hydration (mL)
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .dietaryWater, unit: HKUnit.literUnit(with: .milli)) { sample in
-            let ml = Int(sample.quantity.doubleValue(for: HKUnit.literUnit(with: .milli)))
-            dataManager.addHydration(amountML: ml)
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let millilitreUnit = HKUnit.literUnit(with: .milli)
+        fetchQuantitySamples(identifier: .dietaryWater) { samples in
+            for sample in samples {
+                let ml = Int(sample.quantity.doubleValue(for: millilitreUnit))
+                dataManager.addHydration(amountML: ml)
+                importedCount += 1
+            }
         }
 
-        // stepCount -> activity (steps)
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .stepCount, unit: HKUnit.count()) { sample in
-            let steps = Int(sample.quantity.doubleValue(for: HKUnit.count()))
-            // Map as activity minutes roughly or as activity record with steps in note
-            dataManager.addExercise(minutes: 0, description: "steps:\(steps)")
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let countUnit = HKUnit.count()
+        fetchQuantitySamples(identifier: .stepCount) { samples in
+            for sample in samples {
+                let steps = Int(sample.quantity.doubleValue(for: countUnit))
+                dataManager.addExercise(minutes: 0, description: "steps:\(steps)")
+                importedCount += 1
+            }
         }
 
-        // dietaryEnergyConsumed -> meal (calories)
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .dietaryEnergyConsumed, unit: HKUnit.kilocalorie()) { sample in
-            let kcal = Int(sample.quantity.doubleValue(for: HKUnit.kilocalorie()))
-            dataManager.addMeal(description: "Calories: \(kcal) kcal")
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let kilocalorieUnit = HKUnit.kilocalorie()
+        fetchQuantitySamples(identifier: .dietaryEnergyConsumed) { samples in
+            for sample in samples {
+                let kcal = sample.quantity.doubleValue(for: kilocalorieUnit)
+                dataManager.addMeal(description: "Imported calories", calories: kcal, carbs: nil, protein: nil, fat: nil, fiber: nil)
+                importedCount += 1
+            }
         }
 
-        // bodyMass -> weight
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .bodyMass, unit: HKUnit.gramUnit(with: .kilo)) { sample in
-            let kg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-            dataManager.addWeight(kg: kg)
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let kilogramUnit = HKUnit.gramUnit(with: .kilo)
+        fetchQuantitySamples(identifier: .bodyMass) { samples in
+            for sample in samples {
+                let kg = sample.quantity.doubleValue(for: kilogramUnit)
+                dataManager.addWeight(kg: kg)
+                importedCount += 1
+            }
         }
 
-        // bloodGlucose -> glucose (mg/dL). HK typically uses mmol/L; convert if needed.
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .bloodGlucose, unit: HKUnit(from: "mg/dL")) { sample in
-            let v = sample.quantity.doubleValue(for: HKUnit(from: "mg/dL"))
-            dataManager.addGlucose(mgPerDL: v)
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let glucoseUnit = HKUnit(from: "mg/dL")
+        fetchQuantitySamples(identifier: .bloodGlucose) { samples in
+            for sample in samples {
+                let value = sample.quantity.doubleValue(for: glucoseUnit)
+                dataManager.addGlucose(mgPerDL: value)
+                importedCount += 1
+            }
         }
 
-        // heartRate -> record as symptom/observation
-        dispatchGroup.enter()
-        fetchQuantitySamples(identifier: .heartRate, unit: HKUnit.count().unitDivided(by: HKUnit.minute())) { sample in
-            let bpm = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: HKUnit.minute()))
-            dataManager.addMood(level: Int(bpm), note: "HR \(Int(bpm)) bpm") // reuse mood/symptom mapping
-            importedCount += 1
-        } finished: {
-            dispatchGroup.leave()
+        let heartRateUnit = HKUnit.count().unitDivided(by: HKUnit.minute())
+        fetchQuantitySamples(identifier: .heartRate) { samples in
+            for sample in samples {
+                let bpm = sample.quantity.doubleValue(for: heartRateUnit)
+                dataManager.addMood(level: Int(bpm), note: "HR \(Int(bpm)) bpm") // reuse mood/symptom mapping
+                importedCount += 1
+            }
         }
+
+        dispatchGroup.enter()
+        let workoutType = HKObjectType.workoutType()
+        let store = healthStore
+        let workoutQuery = HKSampleQuery(sampleType: workoutType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samplesOrNil, error in
+            Task { @MainActor in
+                defer { dispatchGroup.leave() }
+
+                if let error = error {
+                    firstError = firstError ?? error
+                    return
+                }
+
+                guard let workouts = samplesOrNil as? [HKWorkout], !workouts.isEmpty else {
+                    return
+                }
+
+                for workout in workouts {
+                    let durationMinutes = max(Int((workout.duration / 60).rounded()), workout.duration > 0 ? 1 : 0)
+                    let calories = await Self.activeCalories(for: workout, store: store)
+                    let summary = Self.workoutSummary(for: workout)
+                    dataManager.addExercise(minutes: durationMinutes, description: summary, calories: calories)
+                    importedCount += 1
+                }
+            }
+        }
+        healthStore.execute(workoutQuery)
 
         dispatchGroup.notify(queue: .main) {
-            if let e = firstError {
-                completion(.failure(e))
-            } else {
-                completion(.success(importedCount))
+            Task { @MainActor in
+                if let error = firstError {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(importedCount))
+                }
             }
+        }
+    }
+}
+
+private extension HealthKitManager {
+    static func activeCalories(for workout: HKWorkout, store: HKHealthStore) async -> Double? {
+        guard let type = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else {
+            return legacyTotalEnergy(for: workout)
+        }
+
+        let workoutPredicate = HKQuery.predicateForSamples(withStart: workout.startDate, end: workout.endDate, options: [.strictStartDate, .strictEndDate])
+
+        return await withCheckedContinuation { continuation in
+            let statisticsQuery = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: workoutPredicate, options: .cumulativeSum) { _, statistics, _ in
+                if let quantity = statistics?.sumQuantity() {
+                    continuation.resume(returning: quantity.doubleValue(for: HKUnit.kilocalorie()))
+                } else if let energy = legacyTotalEnergy(for: workout) {
+                    continuation.resume(returning: energy)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+            store.execute(statisticsQuery)
+        }
+    }
+
+    static func workoutSummary(for workout: HKWorkout) -> String {
+        var parts: [String] = []
+        let activityName = workout.workoutActivityType.displayName
+        parts.append(activityName)
+
+        if let distanceQuantity = workout.totalDistance {
+            let kilometers = distanceQuantity.doubleValue(for: HKUnit.meterUnit(with: .kilo))
+            if kilometers > 0 {
+                parts.append(String(format: "%.2f km", kilometers))
+            }
+        }
+
+        if let metadata = workout.metadata, let location = metadata[HKMetadataKeyWorkoutBrandName] as? String, !location.isEmpty {
+            parts.append(location)
+        }
+
+        return parts.joined(separator: " • ")
+    }
+
+    static func legacyTotalEnergy(for workout: HKWorkout) -> Double? {
+        if #available(iOS 18.0, *) {
+            return nil
+        } else {
+            return workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie())
+        }
+    }
+}
+
+private extension HKWorkoutActivityType {
+    var displayName: String {
+        switch self {
+        case .running: return "Run"
+        case .walking: return "Walk"
+        case .cycling: return "Ride"
+        case .swimming: return "Swim"
+        case .yoga: return "Yoga"
+        case .traditionalStrengthTraining: return "Strength"
+        case .hiking: return "Hike"
+        case .rowing: return "Row"
+        case .elliptical: return "Elliptical"
+        case .functionalStrengthTraining: return "Functional"
+        case .highIntensityIntervalTraining: return "HIIT"
+        default:
+            let description = String(describing: self)
+            if let nameComponent = description.split(separator: ".").last {
+                return nameComponent.replacingOccurrences(of: "_", with: " ").capitalized
+            }
+            return description.capitalized
         }
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+@MainActor
 final class PrivacyManager: ObservableObject {
     @Published private(set) var consents: [Consent] = []
     private let context: ModelContext
@@ -47,5 +48,9 @@ final class PrivacyManager: ObservableObject {
         } catch {
             print("PrivacyManager.set error: \(error)")
         }
+    }
+
+    func isEnabled(_ category: ConsentCategory) -> Bool {
+        consents.first(where: { $0.category == category })?.status ?? true
     }
 }

@@ -15,7 +15,13 @@ struct Glp1CompanionApp: App {
     init() {
     // Create a ModelContainer for our app models. For simplicity we use try! here;
     // in production consider handling initialization failures more gracefully.
-    container = try! ModelContainer(for: User.self, Record.self, Consent.self, AuditLog.self)
+    container = try! ModelContainer(for: User.self,
+                                    Record.self,
+                                    Consent.self,
+                                    AuditLog.self,
+                                    NutritionGoals.self,
+                                    FoodProductCache.self,
+                                    MedicationSchedule.self)
     }
 
     var body: some Scene {

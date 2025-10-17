@@ -12,6 +12,7 @@ struct DailySummary {
     let fiberGoal: Double
     let hydrationML: Double
     let hydrationGoalML: Double
+    let medicationPhase: MedicationPhase?
 
     var netCalories: Double { caloriesIn - caloriesOut }
     var remainingCalories: Double { caloriesGoal - netCalories }
@@ -31,7 +32,7 @@ struct DailyInsight: Identifiable {
 }
 
 enum DailySummaryService {
-    static func summarize(records: [Record], goals: NutritionGoals?) -> DailySummary {
+    static func summarize(records: [Record], goals: NutritionGoals?, schedule: MedicationSchedule?) -> DailySummary {
         var caloriesIn: Double = 0
         var carbs: Double = 0
         var protein: Double = 0
@@ -59,9 +60,10 @@ enum DailySummaryService {
             }
         }
 
-        let phase = goals?.phase ?? .titration
-        let calorieGoal = goals?.dailyCalories ?? 1800
-        let fiberGoal = goals?.dailyFiber ?? phase.suggestedFibreTarget
+        let phase = schedule?.phase
+        let calorieGoal = (goals?.dailyCalories ?? 1800) + (phase?.suggestedCalorieOffset ?? 0)
+        let fiberGoalBase = goals?.dailyFiber ?? 30
+        let fiberGoal = schedule?.phase.suggestedFibreTarget ?? fiberGoalBase
         let hydrationGoal = 2000.0
 
         return DailySummary(
@@ -75,7 +77,8 @@ enum DailySummaryService {
             fiber: fiber,
             fiberGoal: fiberGoal,
             hydrationML: hydration,
-            hydrationGoalML: hydrationGoal
+            hydrationGoalML: hydrationGoal,
+            medicationPhase: phase
         )
     }
 
@@ -144,6 +147,35 @@ enum DailySummaryService {
                     level: .positive
                 )
             )
+        }
+
+        if let phase = summary.medicationPhase {
+            switch phase {
+            case .titration:
+                items.append(
+                    DailyInsight(
+                        title: "Titration focus",
+                        message: "Keep meals gentle and fibre gradual while doses increase.",
+                        level: .neutral
+                    )
+                )
+            case .maintenance:
+                items.append(
+                    DailyInsight(
+                        title: "Maintenance",
+                        message: "Consistency is key—log weekly to keep momentum.",
+                        level: .neutral
+                    )
+                )
+            case .pause:
+                items.append(
+                    DailyInsight(
+                        title: "Pause week",
+                        message: "Without medication, watch hunger cues and keep fibre steady.",
+                        level: .neutral
+                    )
+                )
+            }
         }
 
         return items

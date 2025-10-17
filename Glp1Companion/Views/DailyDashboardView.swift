@@ -7,6 +7,7 @@ struct DailyDashboardView: View {
     @Query(sort: \Record.date, order: .reverse) private var records: [Record]
     @Query private var consents: [Consent]
     @Query private var goalsQuery: [NutritionGoals]
+    @Query private var scheduleQuery: [MedicationSchedule]
     @State private var editingRecord: Record?
     @State private var recordPendingDeletion: Record?
     @State private var showDeleteConfirmation = false
@@ -27,11 +28,12 @@ struct DailyDashboardView: View {
         goalsQuery.first ?? NutritionGoals()
     }
     private var summary: DailySummary {
-        DailySummaryService.summarize(records: todaysRecords, goals: goals)
+        DailySummaryService.summarize(records: todaysRecords, goals: goals, schedule: schedule)
     }
     private var insights: [DailyInsight] {
         DailySummaryService.insights(for: summary)
     }
+    private var schedule: MedicationSchedule? { scheduleQuery.first }
 
     private let summaryColumns: [GridItem] = [
         GridItem(.adaptive(minimum: 160), spacing: 12)
@@ -155,6 +157,7 @@ struct DailyDashboardView: View {
         .onAppear {
             ensureConsentsSeededIfNeeded()
             ensureGoalsSeededIfNeeded()
+            ensureScheduleSeededIfNeeded()
         }
         .alert(item: $consentPrompt) { category in
             Alert(
@@ -222,6 +225,23 @@ struct DailyDashboardView: View {
                 Text(healthSyncError)
                     .font(.caption)
                     .foregroundStyle(.red)
+            }
+            if let schedule {
+                HStack(spacing: 12) {
+                    Label("Phase: \(schedule.phase.displayName)", systemImage: "pills.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption)
+                    if let next = schedule.nextDoseDate {
+                        Text("Next dose \(next.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let notes = schedule.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.horizontal, 20)
@@ -322,15 +342,13 @@ struct DailyDashboardView: View {
             medicationSubtitle = "No medication logged yet"
         }
 
-        let goals = goalsQuery.first ?? NutritionGoals()
-
         let mealRecords = todaysRecords.filter { $0.type == .meal }
         let totalMealCalories = mealRecords.compactMap { $0.calories }.reduce(0, +)
         let totalMealCaloriesInt = Int(totalMealCalories.rounded())
-        let calorieGoal = max(Int(goals.dailyCalories.rounded()), 1)
+        let calorieGoal = max(Int(summary.caloriesGoal.rounded()), 1)
         let mealCount = mealRecords.count
         let fiberTotal = mealRecords.compactMap { $0.fiber }.reduce(0, +)
-        let recommendedFiber: Double = goals.dailyFiber > 0 ? goals.dailyFiber : 30
+        let recommendedFiber: Double = summary.fiberGoal
         let fiberSubtitle: String
         if fiberTotal > 0 {
             fiberSubtitle = String(format: "Fiber %.0fg of %.0fg", fiberTotal, recommendedFiber)
@@ -535,6 +553,18 @@ struct DailyDashboardView: View {
                 try context.save()
             } catch {
                 print("DailyDashboardView.ensureGoalsSeededIfNeeded error: \(error)")
+            }
+        }
+    }
+
+    private func ensureScheduleSeededIfNeeded() {
+        if scheduleQuery.isEmpty {
+            let schedule = MedicationSchedule()
+            context.insert(schedule)
+            do {
+                try context.save()
+            } catch {
+                print("DailyDashboardView.ensureScheduleSeededIfNeeded error: \(error)")
             }
         }
     }

@@ -90,7 +90,7 @@ enum GLP1MedicationLibrary {
         )
     ]
 
-    static var default: GLP1Medication {
+    static var defaultMedication: GLP1Medication {
         medications.first ?? GLP1Medication(
             id: "default",
             brandName: "GLP-1",

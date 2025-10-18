@@ -7,13 +7,14 @@ final class NutritionGoals {
     var createdAt: Date
     var updatedAt: Date
 
-    var dailyCalories: Double
-    var dailyCarbs: Double
-    var dailyProtein: Double
-    var dailyFat: Double
-    var dailyFiber: Double
-    var dailyHydrationML: Double
-    var hydrationTypesEnabled: [FluidType.RawValue]
+    var dailyCalories: Double = 1800
+    var dailyCarbs: Double = 130
+    var dailyProtein: Double = 90
+    var dailyFat: Double = 60
+    var dailyFiber: Double = 30
+    var dailyHydrationML: Double = 2000
+    var hydrationTypesRaw: String = FluidType.allCases.map { $0.rawValue }.joined(separator: ",")
+    var preferredWeightUnitRaw: String = WeightUnit.kilograms.rawValue
     @Relationship(deleteRule: .cascade) var history: [GoalHistoryEntry] = []
 
     init(id: UUID = UUID(),
@@ -25,7 +26,8 @@ final class NutritionGoals {
          dailyFat: Double = 60,
          dailyFiber: Double = 30,
          dailyHydrationML: Double = 2000,
-         hydrationTypesEnabled: [FluidType.RawValue] = FluidType.allCases.map { $0.rawValue }) {
+         hydrationTypesRaw: String = FluidType.allCases.map { $0.rawValue }.joined(separator: ","),
+         preferredWeightUnitRaw: String = WeightUnit.kilograms.rawValue) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -35,6 +37,21 @@ final class NutritionGoals {
         self.dailyFat = dailyFat
         self.dailyFiber = dailyFiber
         self.dailyHydrationML = dailyHydrationML
-        self.hydrationTypesEnabled = hydrationTypesEnabled
+        self.hydrationTypesRaw = hydrationTypesRaw
+        self.preferredWeightUnitRaw = preferredWeightUnitRaw
+    }
+
+    var preferredWeightUnit: WeightUnit {
+        get { WeightUnit(rawValue: preferredWeightUnitRaw) ?? .kilograms }
+        set { preferredWeightUnitRaw = newValue.rawValue }
+    }
+
+    var hydrationTypesEnabled: [FluidType] {
+        get {
+            hydrationTypesRaw.split(separator: ",").compactMap { FluidType(rawValue: String($0)) }
+        }
+        set {
+            hydrationTypesRaw = newValue.map { $0.rawValue }.joined(separator: ",")
+        }
     }
 }

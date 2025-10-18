@@ -13,6 +13,7 @@ struct GoalsSettingsView: View {
     @State private var fiberText: String
     @State private var hydrationText: String
     @State private var selectedFluids: Set<FluidType>
+    @State private var weightUnit: WeightUnit
 
     init(goals: NutritionGoals) {
         self._goals = Bindable(goals)
@@ -22,8 +23,9 @@ struct GoalsSettingsView: View {
         _fatText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyFat))
         _fiberText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyFiber))
         _hydrationText = State(initialValue: GoalsSettingsView.formatNumber(goals.dailyHydrationML))
-        let allowed = Set(goals.hydrationTypesEnabled.compactMap { FluidType(rawValue: $0) })
+        let allowed = Set(goals.hydrationTypesEnabled)
         _selectedFluids = State(initialValue: allowed.isEmpty ? Set(FluidType.allCases) : allowed)
+        _weightUnit = State(initialValue: goals.preferredWeightUnit)
     }
 
     var body: some View {
@@ -39,6 +41,15 @@ struct GoalsSettingsView: View {
                 Section(footer: Text("Fibre helps GLP-1 medication users manage satiety and digestion. Aim for at least 30g per day unless your clinician advises otherwise.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)) { EmptyView() }
+
+                Section(header: Text("Weight tracking")) {
+                    Picker("Preferred unit", selection: $weightUnit) {
+                        ForEach(WeightUnit.allCases) { unit in
+                            Text(unit.displayName).tag(unit)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
 
                 Section(header: Text("Hydration")) {
                     NumericGoalField(title: "Daily goal", suffix: "mL", text: $hydrationText)
@@ -97,7 +108,8 @@ struct GoalsSettingsView: View {
         goals.dailyFat = GoalsSettingsView.parseNumber(fatText) ?? goals.dailyFat
         goals.dailyFiber = GoalsSettingsView.parseNumber(fiberText) ?? goals.dailyFiber
         goals.dailyHydrationML = GoalsSettingsView.parseNumber(hydrationText) ?? goals.dailyHydrationML
-        goals.hydrationTypesEnabled = selectedFluids.map { $0.rawValue }
+        goals.hydrationTypesEnabled = Array(selectedFluids)
+        goals.preferredWeightUnit = weightUnit
         let entry = GoalHistoryEntry(date: Date(),
                                      calories: goals.dailyCalories,
                                      carbs: goals.dailyCarbs,

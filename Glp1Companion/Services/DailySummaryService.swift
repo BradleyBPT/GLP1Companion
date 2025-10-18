@@ -13,9 +13,15 @@ struct DailySummary {
     let hydrationML: Double
     let hydrationGoalML: Double
     let medicationPhase: MedicationPhase?
+    let moodScores: [Int]
+    let latestMood: Int?
 
     var netCalories: Double { caloriesIn - caloriesOut }
     var remainingCalories: Double { caloriesGoal - netCalories }
+    var averageMood: Double? {
+        guard !moodScores.isEmpty else { return nil }
+        return Double(moodScores.reduce(0, +)) / Double(moodScores.count)
+    }
 }
 
 struct DailyInsight: Identifiable {
@@ -40,6 +46,9 @@ enum DailySummaryService {
         var fiber: Double = 0
         var hydration: Double = 0
         var caloriesOut: Double = 0
+        var moodScores: [Int] = []
+        var latestMoodScore: Int?
+        var latestMoodDate: Date = .distantPast
 
         for record in records {
             switch record.type {
@@ -51,6 +60,14 @@ enum DailySummaryService {
                 fiber += record.fiber ?? 0
             case .activity:
                 caloriesOut += record.calories ?? 0
+            case .mood:
+                if let value = record.value.flatMap(Int.init) {
+                    moodScores.append(value)
+                    if record.date > latestMoodDate {
+                        latestMoodDate = record.date
+                        latestMoodScore = value
+                    }
+                }
             default:
                 continue
             }
@@ -78,7 +95,9 @@ enum DailySummaryService {
             fiberGoal: fiberGoal,
             hydrationML: hydration,
             hydrationGoalML: hydrationGoal,
-            medicationPhase: phase
+            medicationPhase: phase,
+            moodScores: moodScores,
+            latestMood: latestMoodScore
         )
     }
 
@@ -176,6 +195,34 @@ enum DailySummaryService {
                     )
                 )
             }
+        }
+
+        if let avgMood = summary.averageMood {
+            if avgMood >= 4 {
+                items.append(
+                    DailyInsight(
+                        title: "Positive mood",
+                        message: "Mood average is \(String(format: "%.1f", avgMood))/5. Keep reinforcing routines that feel good.",
+                        level: .positive
+                    )
+                )
+            } else if avgMood < 3 {
+                items.append(
+                    DailyInsight(
+                        title: "Mood dip",
+                        message: "Mood scores are trending low. Consider gentle activity, protein-rich meals, or speaking with your care team if this persists.",
+                        level: .warning
+                    )
+                )
+            }
+        } else {
+            items.append(
+                DailyInsight(
+                    title: "Log mood",
+                    message: "Track how you feel with the mood quick action to see patterns alongside nutrition.",
+                    level: .neutral
+                )
+            )
         }
 
         return items

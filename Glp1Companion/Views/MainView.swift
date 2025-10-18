@@ -10,6 +10,9 @@ struct MainView: View {
                 .navigationTitle("Health Companion")
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        NavigationLink(destination: ProgressViewScreen()) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                        }
                         NavigationLink(destination: MedicationScheduleContainerView()) {
                             Image(systemName: "pills.fill")
                         }

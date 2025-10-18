@@ -207,5 +207,6 @@ struct MedicationScheduleView: View {
     container.mainContext.insert(schedule)
     return NavigationStack {
         MedicationScheduleView(schedule: schedule)
-    }.modelContainer(container)
+    }
+    .modelContainer(container)
 }

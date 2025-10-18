@@ -8,6 +8,7 @@ enum RecordType: String, Codable {
     case medication
     case weight
     case activity
+    case mood
 }
 
 @Model

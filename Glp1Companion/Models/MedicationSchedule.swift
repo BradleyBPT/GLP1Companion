@@ -49,9 +49,9 @@ final class MedicationSchedule {
     init(id: UUID = UUID(),
          createdAt: Date = Date(),
          updatedAt: Date = Date(),
-         medicationID: String? = GLP1MedicationLibrary.default.id,
-         medicationName: String = GLP1MedicationLibrary.default.brandName,
-         currentDose: String = GLP1MedicationLibrary.default.titrationDoses.first ?? "0.25 mg",
+         medicationID: String? = GLP1MedicationLibrary.defaultMedication.id,
+         medicationName: String = GLP1MedicationLibrary.defaultMedication.brandName,
+         currentDose: String = GLP1MedicationLibrary.defaultMedication.titrationDoses.first ?? "0.25 mg",
          phase: MedicationPhase = .titration,
          nextDoseDate: Date? = nil,
          notes: String? = nil) {

@@ -51,6 +51,8 @@ struct FluidIntakeCard: View {
                                           fiberGoal: 30,
                                           hydrationML: 1500,
                                           hydrationGoalML: 2000,
-                                          medicationPhase: .titration))
+                                          medicationPhase: .titration,
+                                          moodScores: [],
+                                          latestMood: nil))
         .padding()
 }

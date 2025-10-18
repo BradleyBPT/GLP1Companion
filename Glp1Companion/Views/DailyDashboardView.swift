@@ -26,6 +26,13 @@ struct DailyDashboardView: View {
     @State private var hydrationAmount: Double = 250
     @State private var hydrationType: FluidType = .water
     @State private var hydrationNotes: String = ""
+    @State private var showMoodSheet = false
+    @State private var moodLevel: Double = 3
+    @State private var moodEmotion: MoodEmotion = .calm
+    @State private var moodNotes: String = ""
+    @State private var showWeightSheet = false
+    @State private var weightValue: Double = 72
+    @State private var weightUnitSelection: WeightUnit = .kilograms
 
     private let healthKitManager = HealthKitManager()
     private var goals: NutritionGoals {
@@ -35,7 +42,7 @@ struct DailyDashboardView: View {
         DailySummaryService.summarize(records: todaysRecords, fluidLogs: todayFluidLogs, goals: goals, schedule: schedule)
     }
     private var insights: [DailyInsight] {
-        DailySummaryService.insights(for: summary)
+        DailySummaryService.insights(for: summary) + weightInsights
     }
     private var schedule: MedicationSchedule? { scheduleQuery.first }
     private var todayFluidLogs: [FluidIntakeLog] {
@@ -44,6 +51,31 @@ struct DailyDashboardView: View {
         let predicate = #Predicate<FluidIntakeLog> { $0.date >= start && $0.date < end }
         let descriptor = FetchDescriptor<FluidIntakeLog>(predicate: predicate, sortBy: [SortDescriptor(\.date, order: .reverse)])
         return (try? context.fetch(descriptor)) ?? []
+    }
+    private var weightUnit: WeightUnit { goals.preferredWeightUnit }
+    private var weightRecords: [Record] {
+        records.filter { $0.type == .weight }.sorted { $0.date > $1.date }
+    }
+    private var weightInsights: [DailyInsight] {
+        guard weightRecords.count >= 2,
+              let latestString = weightRecords.first?.value,
+              let latestKG = Double(latestString),
+              let previousString = weightRecords.dropFirst().first?.value,
+              let previousKG = Double(previousString) else {
+            return []
+        }
+        let deltaKG = latestKG - previousKG
+        let deltaConverted = weightUnit.convertFromKG(deltaKG)
+        guard abs(deltaConverted) >= 0.05 else { return [] }
+        let formattedDelta = String(format: "%+.2f %@", deltaConverted, weightUnit == .kilograms ? "kg" : "st")
+        let level: DailyInsight.Level = deltaConverted < 0 ? .positive : .warning
+        let message: String
+        if deltaConverted < 0 {
+            message = "Weight down by \(formattedDelta) compared to last log. Keep tracking alongside GLP-1 progress."
+        } else {
+            message = "Weight up by \(formattedDelta). Review meals or activity if this trend continues."
+        }
+        return [DailyInsight(title: "Weight change", message: message, level: level)]
     }
 
     private let summaryColumns: [GridItem] = [
@@ -72,6 +104,8 @@ struct DailyDashboardView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                    WeightHistoryLink(records: weightRecords, unit: weightUnit)
+                        .padding(.horizontal, 20)
                 }
 
                 FluidIntakeSection(summary: summary) {
@@ -165,6 +199,22 @@ struct DailyDashboardView: View {
                 hydrationNotes = ""
             } onCancel: {
                 showHydrationSheet = false
+            }
+        }
+        .sheet(isPresented: $showMoodSheet) {
+            MoodEntrySheet(level: $moodLevel, emotion: $moodEmotion, notes: $moodNotes) { level, emotion, notes in
+                logMood(level: level, emotion: emotion, notes: notes)
+                showMoodSheet = false
+            } onCancel: {
+                showMoodSheet = false
+            }
+        }
+        .sheet(isPresented: $showWeightSheet) {
+            WeightEntrySheet(value: $weightValue, unit: $weightUnitSelection) { value, unit in
+                logWeight(amount: value, unit: unit)
+                showWeightSheet = false
+            } onCancel: {
+                showWeightSheet = false
             }
         }
         .overlay(alignment: .top) {
@@ -328,7 +378,21 @@ struct DailyDashboardView: View {
                 performQuickAction(for: .symptoms) { $0.addGlucose(mgPerDL: 5.6) }
             },
             QuickAction(label: "Weight", icon: "scalemass", tint: .blue) {
-                performQuickAction(for: .weight) { $0.addWeight(kg: 72.3) }
+                let presentSheet = {
+                    weightUnitSelection = weightUnit
+                    if let latest = weightRecords.first, let value = latest.value.flatMap(Double.init) {
+                        weightValue = weightUnit.convertFromKG(value)
+                    } else {
+                        weightValue = weightUnit == .kilograms ? 72 : 11.3
+                    }
+                    showWeightSheet = true
+                }
+                if isConsentEnabled(.weight) {
+                    presentSheet()
+                } else {
+                    pendingAction = { presentSheet() }
+                    consentPrompt = .weight
+                }
             },
             QuickAction(label: "Exercise", icon: "figure.walk", tint: .purple) {
                 performQuickAction(for: .activity) { $0.addExercise(minutes: 30, description: "Walk") }
@@ -358,7 +422,18 @@ struct DailyDashboardView: View {
                 }
             },
             QuickAction(label: "Mood", icon: "face.smiling", tint: .pink) {
-                performQuickAction(for: .symptoms) { $0.addMood(level: 4) }
+                let presentSheet = {
+                    moodLevel = 3
+                    moodEmotion = .calm
+                    moodNotes = ""
+                    showMoodSheet = true
+                }
+                if isConsentEnabled(.symptoms) {
+                    presentSheet()
+                } else {
+                    pendingAction = { presentSheet() }
+                    consentPrompt = .symptoms
+                }
             }
         ]
     }
@@ -474,21 +549,49 @@ struct DailyDashboardView: View {
             SummaryItem(title: "Activity", value: activityValue, subtitle: activitySubtitle, icon: "figure.walk", tint: .purple)
         ]
 
-        if let weightRecord = todaysRecords.first(where: { $0.type == .weight }) {
-            let formattedValue: String
-            if let valueString = weightRecord.value, let weightValue = Double(valueString) {
-                formattedValue = String(format: "%.1f kg", weightValue)
-            } else if let valueString = weightRecord.value {
-                formattedValue = "\(valueString) kg"
+        if let avgMood = summary.averageMood {
+            let latest = summary.latestMood.map { moodEmoji(for: $0) } ?? moodEmoji(for: Int(avgMood.rounded()))
+            let moodTitle = "Mood"
+            let value = "\(latest) \(String(format: "%.1f", avgMood))/5"
+            let subtitle: String
+            if summary.moodScores.count > 1 {
+                subtitle = "\(summary.moodScores.count) entries today"
             } else {
-                formattedValue = "--"
+                subtitle = "Log mood to spot trends"
             }
-            let time = weightRecord.date.formatted(date: .omitted, time: .shortened)
+            items.append(SummaryItem(title: moodTitle, value: value, subtitle: subtitle, icon: "face.smiling", tint: .pink))
+        } else {
+            items.append(SummaryItem(title: "Mood", value: "--", subtitle: "Log mood to track how you feel", icon: "face.smiling", tint: .pink))
+        }
+
+        if let latest = weightRecords.first, let valueString = latest.value, let weightKG = Double(valueString) {
+            let converted = weightUnit.convertFromKG(weightKG)
+            let formattedValue = String(format: weightUnit == .kilograms ? "%.1f kg" : "%.1f st", converted)
+            var subtitleParts: [String] = []
+            subtitleParts.append("Updated \(latest.date.formatted(date: .abbreviated, time: .shortened))")
+            if weightRecords.count > 1, let previousValueString = weightRecords.dropFirst().first?.value, let previous = Double(previousValueString) {
+                let deltaKG = weightKG - previous
+                if abs(deltaKG) >= 0.05 {
+                    let deltaConverted = weightUnit.convertFromKG(deltaKG)
+                    let sign = deltaConverted >= 0 ? "+" : ""
+                    subtitleParts.append("Change \(sign)\(String(format: weightUnit == .kilograms ? "%.2f" : "%.2f", deltaConverted)) \(weightUnit == .kilograms ? "kg" : "st")")
+                }
+            }
             items.append(
                 SummaryItem(
                     title: "Weight",
                     value: formattedValue,
-                    subtitle: "Updated \(time)",
+                    subtitle: subtitleParts.joined(separator: " • "),
+                    icon: "scalemass",
+                    tint: .blue
+                )
+            )
+        } else {
+            items.append(
+                SummaryItem(
+                    title: "Weight",
+                    value: "--",
+                    subtitle: "Log weight to track progress",
                     icon: "scalemass",
                     tint: .blue
                 )
@@ -572,6 +675,23 @@ struct DailyDashboardView: View {
     private func withFluidManager(_ action: @MainActor (FluidLogManager) -> Void) {
         let manager = FluidLogManager(context: context)
         action(manager)
+    }
+
+    private func logMood(level: Double, emotion: MoodEmotion, notes: String) {
+        let score = Int(level.rounded())
+        let composedNote = emotion.displayName + (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : " – " + notes)
+        withManager { manager in
+            manager.addMood(level: score, note: composedNote)
+        }
+        showFlash("Mood logged")
+    }
+
+    private func logWeight(amount: Double, unit: WeightUnit) {
+        let kg = unit.convertToKG(value: amount)
+        withManager { manager in
+            manager.addWeight(kg: kg, note: nil)
+        }
+        showFlash("Weight logged")
     }
 
     private func deleteRecord(_ record: Record) {
@@ -707,6 +827,8 @@ struct DailyDashboardView: View {
             return "scalemass"
         case .activity:
             return "figure.walk"
+        case .mood:
+            return "face.smiling"
         }
     }
 
@@ -724,6 +846,8 @@ struct DailyDashboardView: View {
             return .blue
         case .activity:
             return .purple
+        case .mood:
+            return .pink
         }
     }
 
@@ -745,6 +869,11 @@ struct DailyDashboardView: View {
             return record.note ?? "Activity"
         case .hydration, .weight:
             return record.type.rawValue.capitalized
+        case .mood:
+            if let note = record.note, !note.isEmpty {
+                return note.components(separatedBy: " – ").first ?? "Mood"
+            }
+            return "Mood"
         }
     }
 
@@ -777,10 +906,10 @@ struct DailyDashboardView: View {
             if let value = record.value, !value.isEmpty { parts.append(value) }
             return parts.isEmpty ? nil : parts.joined(separator: " • ")
         case .weight:
-            if let note = record.note, !note.isEmpty {
-                return note
+            if let value = record.value, let kg = Double(value) {
+                return weightUnit.format(kg: kg)
             }
-            return nil
+            return record.note
         case .activity:
             var parts: [String] = []
             if let value = record.value, let minutes = Int(value), minutes > 0 {
@@ -796,6 +925,15 @@ struct DailyDashboardView: View {
             }
             if let calories = record.calories {
                 parts.append("\(Int(calories)) kcal")
+            }
+            return parts.isEmpty ? nil : parts.joined(separator: " • ")
+        case .mood:
+            var parts: [String] = []
+            if let value = record.value, let score = Int(value) {
+                parts.append("Score \(score)/5")
+            }
+            if let note = record.note, !note.isEmpty {
+                parts.append(note)
             }
             return parts.isEmpty ? nil : parts.joined(separator: " • ")
         }
@@ -819,12 +957,17 @@ struct DailyDashboardView: View {
             }
         case .weight:
             if let value = record.value, let weight = Double(value) {
-                return String(format: "%.1f kg", weight)
+                let converted = weightUnit.convertFromKG(weight)
+                return String(format: weightUnit == .kilograms ? "%.1f kg" : "%.1f st", converted)
             }
             return record.value
         case .activity:
             if let value = record.value, let minutes = Int(value), minutes > 0 {
                 return "\(minutes) min"
+            }
+        case .mood:
+            if let value = record.value, let score = Int(value) {
+                return moodEmoji(for: score)
             }
         }
         return nil
@@ -999,7 +1142,21 @@ private struct FluidIntakeSection: View {
                 }
                 .buttonStyle(.bordered)
             }
-            FluidIntakeCard(summary: summary)
+                FluidIntakeCard(summary: summary)
+        }
+    }
+}
+
+private struct WeightHistoryLink: View {
+    let records: [Record]
+    let unit: WeightUnit
+
+    var body: some View {
+        if !records.isEmpty {
+            NavigationLink("View weight history") {
+                WeightHistoryView(records: records, unit: unit)
+            }
+            .font(.footnote)
         }
     }
 }
@@ -1046,6 +1203,117 @@ private struct HydrationLogSheet: View {
                 }
             }
         }
+    }
+}
+
+private struct WeightEntrySheet: View {
+    @Binding var value: Double
+    @Binding var unit: WeightUnit
+
+    let onSave: (Double, WeightUnit) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Weight")) {
+                    TextField(unit == .kilograms ? "Weight (kg)" : "Weight (st)", value: $value, format: .number.precision(.fractionLength(1)))
+                        .keyboardType(.decimalPad)
+                    Picker("Unit", selection: $unit) {
+                        ForEach(WeightUnit.allCases) { unit in
+                            Text(unit.displayName).tag(unit)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+            .navigationTitle("Log weight")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(value, unit) }
+                        .disabled(value <= 0)
+                }
+            }
+        }
+    }
+}
+
+enum MoodEmotion: String, CaseIterable, Identifiable {
+    case energized
+    case calm
+    case focused
+    case anxious
+    case fatigued
+    case nauseous
+    case celebratory
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .energized: return "Energised"
+        case .calm: return "Calm"
+        case .focused: return "Focused"
+        case .anxious: return "Anxious"
+        case .fatigued: return "Fatigued"
+        case .nauseous: return "Nauseous"
+        case .celebratory: return "Celebratory"
+        }
+    }
+}
+
+private struct MoodEntrySheet: View {
+    @Binding var level: Double
+    @Binding var emotion: MoodEmotion
+    @Binding var notes: String
+
+    let onSave: (Double, MoodEmotion, String) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Mood level"), footer: Text("1 = very low, 5 = very positive")) {
+                    HStack {
+                        Slider(value: $level, in: 1...5, step: 1)
+                        Text("\(Int(level))")
+                    }
+                }
+
+                Picker("Emotion", selection: $emotion) {
+                    ForEach(MoodEmotion.allCases) { mood in
+                        Text(mood.displayName).tag(mood)
+                    }
+                }
+
+                Section(header: Text("Notes")) {
+                    TextEditor(text: $notes)
+                        .frame(height: 120)
+                }
+            }
+            .navigationTitle("Log mood")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(level, emotion, notes) }
+                }
+            }
+        }
+    }
+}
+
+private func moodEmoji(for score: Int) -> String {
+    switch score {
+    case ..<2: return "☹️"
+    case 2: return "🙁"
+    case 3: return "😐"
+    case 4: return "🙂"
+    default: return "😄"
     }
 }
 
@@ -1197,6 +1465,8 @@ private struct RecordEditSheet: View {
         switch record.type {
         case .meal:
             return false
+        case .mood:
+            return false
         default:
             return true
         }
@@ -1216,6 +1486,8 @@ private struct RecordEditSheet: View {
             return "Weight"
         case .activity:
             return "Duration / Value"
+        case .mood:
+            return "Score"
         }
     }
 
@@ -1233,6 +1505,8 @@ private struct RecordEditSheet: View {
             return "Note"
         case .activity:
             return "Description"
+        case .mood:
+            return "Emotion"
         }
     }
 
@@ -1240,7 +1514,7 @@ private struct RecordEditSheet: View {
         switch record.type {
         case .hydration, .symptom, .weight, .activity:
             return .decimalPad
-        case .medication, .meal:
+        case .medication, .meal, .mood:
             return .default
         }
     }
@@ -1550,6 +1824,8 @@ private extension Record {
             return "Weight"
         case .activity:
             return "Activity"
+        case .mood:
+            return "Mood"
         }
     }
 }

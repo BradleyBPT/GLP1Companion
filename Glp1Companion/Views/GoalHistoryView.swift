@@ -38,7 +38,7 @@ struct GoalHistoryView: View {
         GoalHistoryEntry(date: Date(), calories: 1800, carbs: 120, protein: 80, fat: 60, fiber: 28, reason: .manual, notes: "Initial goals"),
         GoalHistoryEntry(date: Date().addingTimeInterval(-86400), calories: 1600, carbs: 110, protein: 90, fat: 55, fiber: 30, reason: .titrationStart, notes: "Dose increased" )
     ]
-    return NavigationStack {
+    NavigationStack {
         GoalHistoryView(history: entries)
     }
 }

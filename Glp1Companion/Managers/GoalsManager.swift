@@ -29,14 +29,16 @@ final class GoalsManager: ObservableObject {
                 fat: Double,
                 fiber: Double,
                 hydration: Double,
-                allowedFluids: [FluidType]) {
+                allowedFluids: [FluidType],
+                weightUnit: WeightUnit) {
         goals.dailyCalories = calories
         goals.dailyCarbs = carbs
         goals.dailyProtein = protein
         goals.dailyFat = fat
         goals.dailyFiber = fiber
         goals.dailyHydrationML = hydration
-        goals.hydrationTypesEnabled = allowedFluids.map { $0.rawValue }
+        goals.hydrationTypesEnabled = allowedFluids
+        goals.preferredWeightUnit = weightUnit
         goals.updatedAt = Date()
         appendHistory(reason: .manual)
         do {

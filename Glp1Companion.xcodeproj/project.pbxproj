@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B49318552EA2E8D3008B44F5 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B49318542EA2E8D3008B44F5 /* HealthKit.framework */; };
+		B49318572EA2E8E0008B44F5 /* HealthKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B49318562EA2E8E0008B44F5 /* HealthKitUI.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		B45BA7B72E9B33CC001A9938 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,10 @@
 		B45BA7A92E9B33CC001A9938 /* Glp1Companion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glp1Companion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B45BA7B62E9B33CC001A9938 /* Glp1CompanionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Glp1CompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B45BA7C02E9B33CC001A9938 /* Glp1CompanionUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Glp1CompanionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B49318542EA2E8D3008B44F5 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/HealthKit.framework; sourceTree = DEVELOPER_DIR; };
+		B49318562EA2E8E0008B44F5 /* HealthKitUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKitUI.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/iOSSupport/System/Library/Frameworks/HealthKitUI.framework; sourceTree = DEVELOPER_DIR; };
+		B49318582EA2E8F1008B44F5 /* libswiftHealthKit.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftHealthKit.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/usr/lib/swift/libswiftHealthKit.tbd; sourceTree = DEVELOPER_DIR; };
+		B49318592EA2E8FB008B44F5 /* libSystemHealth.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libSystemHealth.tbd; path = usr/lib/libSystemHealth.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -66,6 +75,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B49318552EA2E8D3008B44F5 /* HealthKit.framework in Frameworks */,
+				B49318572EA2E8E0008B44F5 /* HealthKitUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +89,7 @@
 				B45BA7AB2E9B33CC001A9938 /* Glp1Companion */,
 				B45BA7B92E9B33CC001A9938 /* Glp1CompanionTests */,
 				B45BA7C32E9B33CC001A9938 /* Glp1CompanionUITests */,
+				B49318532EA2E8D3008B44F5 /* Frameworks */,
 				B45BA7AA2E9B33CC001A9938 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +102,17 @@
 				B45BA7C02E9B33CC001A9938 /* Glp1CompanionUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B49318532EA2E8D3008B44F5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B49318592EA2E8FB008B44F5 /* libSystemHealth.tbd */,
+				B49318582EA2E8F1008B44F5 /* libswiftHealthKit.tbd */,
+				B49318562EA2E8E0008B44F5 /* HealthKitUI.framework */,
+				B49318542EA2E8D3008B44F5 /* HealthKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -195,6 +218,12 @@
 			);
 			mainGroup = B45BA7A02E9B33CC001A9938;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B493185A2EA2F018008B44F5 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
+				B493185B2EA2F024008B44F5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				B493185C2EA2F061008B44F5 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */,
+				B493185D2EA2F080008B44F5 /* XCRemoteSwiftPackageReference "swift-system" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B45BA7AA2E9B33CC001A9938 /* Products */;
 			projectDirPath = "";
@@ -327,6 +356,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				NEW_SETTING = "";
+				NEW_SETTING1 = "";
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -386,6 +416,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				NEW_SETTING = "";
+				NEW_SETTING1 = "";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -397,6 +428,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Glp1Companion/Glp1CompanionDebug.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
@@ -412,8 +445,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1Companion;
+				PRODUCT_BUNDLE_IDENTIFIER = "co.uk.glp-1companion.glp-1companion";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -425,6 +459,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Glp1Companion/Glp1Companion.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
@@ -440,8 +476,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1Companion;
+				PRODUCT_BUNDLE_IDENTIFIER = "co.uk.glp-1companion.glp-1companion";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -452,13 +489,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1CompanionTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "co.uk.glp-1companion.glp-1companion";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -471,13 +509,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1CompanionTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "co.uk.glp-1companion.glp-1companion";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -489,13 +528,15 @@
 		B45BA7D12E9B33CC001A9938 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1CompanionUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = U5SG55UDZ3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -506,13 +547,15 @@
 		B45BA7D22E9B33CC001A9938 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U5SG55UDZ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = BigPictureThinking.Glp1CompanionUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = U5SG55UDZ3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -560,6 +603,41 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B493185A2EA2F018008B44F5 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
+		B493185B2EA2F024008B44F5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.2;
+			};
+		};
+		B493185C2EA2F061008B44F5 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-async-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.4;
+			};
+		};
+		B493185D2EA2F080008B44F5 /* XCRemoteSwiftPackageReference "swift-system" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-system.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = B45BA7A12E9B33CC001A9938 /* Project object */;
 }

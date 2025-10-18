@@ -76,8 +76,8 @@ final class DataManager: ObservableObject {
         }
     }
 
-    func addWeight(kg: Double) {
-        let record = Record(type: .weight, date: Date(), value: String(format: "%.1f", kg), note: nil)
+    func addWeight(kg: Double, note: String? = nil) {
+        let record = Record(type: .weight, date: Date(), value: String(format: "%.2f", kg), note: note)
         let auditEntry = AuditLog(actionType: .create, timestamp: Date(), targetEntity: "Record", details: "weight:\(kg)")
         context.insert(record)
         context.insert(auditEntry)
@@ -135,8 +135,7 @@ final class DataManager: ObservableObject {
     }
 
     func addMood(level: Int, note: String? = nil) {
-        // Represent mood as a 'symptom' record for now.
-        let record = Record(type: .symptom, date: Date(), value: "\(level)", note: note ?? "mood")
+        let record = Record(type: .mood, date: Date(), value: "\(level)", note: note)
         let auditEntry = AuditLog(actionType: .create, timestamp: Date(), targetEntity: "Record", details: "mood:\(level)")
         context.insert(record)
         context.insert(auditEntry)
